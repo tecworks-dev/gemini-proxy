@@ -1,62 +1,41 @@
-from flask import Flask, request, jsonify, Response, after_this_request
+from flask import Flask, request, Response
 import requests
 import logging
+import sys
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
 API_URL = "https://generativelanguage.googleapis.com/"
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 @app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def proxy(path):
     """
-    Transparent reverse proxy to forward requests to the Google Generative Language API.
-
-    Args:
-    path (str): The API path that is appended to the base URL.
-
-    Returns:
-    Response object: The response from the Google API, forwarded back to the client.
+    A transparent reverse proxy to forward requests to an API.
     """
     url = f"{API_URL}{path}"
-
-    # Forward the headers
-    headers = dict(request.headers)
+    headers = {key: value for key, value in request.headers if key != 'Host'}
     headers.pop('Content-Length', None)
 
-    # Forward the method
-    method = request.method
+    # Log the request
+    logger.info(f"Forwarding request to {url} with method {request.method}")
 
-    # Log the incoming request
-    logger.info(f"Request {method} to {url} with headers {headers} and query {request.args}")
+    resp = requests.request(method=request.method, url=url, headers=headers, data=request.get_data(), params=request.args, allow_redirects=False)
 
-    # Handle different request methods
-    if method == 'GET':
-        resp = requests.get(url, headers=headers, params=request.args)
-    elif method == 'POST':
-        resp = requests.post(url, headers=headers, json=request.json, params=request.args)
-    elif method == 'PUT':
-        resp = requests.put(url, headers=headers, json=request.json, params=request.args)
-    elif method == 'DELETE':
-        resp = requests.delete(url, headers=headers, params=request.args)
+    # Log the response
+    logger.info(f"Received {resp.status_code} response from the upstream server")
 
-    @after_this_request
-    def log_response(response):
-        # Log the response
-        logger.info(f"Response from {url} with status {resp.status_code} and headers {resp.headers}")
-        return response
+    excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
+    headers = [(name, value) for (name, value) in resp.raw.headers.items() if name.lower() not in excluded_headers]
 
-    # Create a response object and mimic the upstream server's response
+    # Correctly set headers for the response
     response = Response(resp.content, resp.status_code)
-    response.headers.extend(resp.headers)
+    for header in headers:
+        response.headers[header[0]] = header[1]
 
-    # Return the proxied response
     return response
 
 if __name__ == '__main__':
-    
-    logger.info(f"Ready to receive requests")
     app.run(debug=True, host='0.0.0.0', port=5000)
