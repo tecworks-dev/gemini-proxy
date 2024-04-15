@@ -1,9 +1,14 @@
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, after_this_request
 import requests
+import logging
 
 app = Flask(__name__)
 
 API_URL = "https://generativelanguage.googleapis.com/"
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def proxy(path):
@@ -20,12 +25,13 @@ def proxy(path):
 
     # Forward the headers
     headers = dict(request.headers)
-
-    # Ensure we delete content-length if present because it may cause issues if the proxy modifies the request slightly.
     headers.pop('Content-Length', None)
 
     # Forward the method
     method = request.method
+
+    # Log the incoming request
+    logger.info(f"Request {method} to {url} with headers {headers} and query {request.args}")
 
     # Handle different request methods
     if method == 'GET':
@@ -36,6 +42,12 @@ def proxy(path):
         resp = requests.put(url, headers=headers, json=request.json, params=request.args)
     elif method == 'DELETE':
         resp = requests.delete(url, headers=headers, params=request.args)
+
+    @after_this_request
+    def log_response(response):
+        # Log the response
+        logger.info(f"Response from {url} with status {resp.status_code} and headers {resp.headers}")
+        return response
 
     # Create a response object and mimic the upstream server's response
     response = Response(resp.content, resp.status_code)
