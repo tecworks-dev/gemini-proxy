@@ -62,6 +62,7 @@ def proxy(path):
 
     # Correctly set headers for the response
     response = Response(resp.content, resp.status_code)
+    logger.debug(f"response : {resp.content}")
     for header in headers:
         response.headers[header[0]] = header[1]
 
