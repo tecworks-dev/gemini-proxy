@@ -4,8 +4,38 @@ import logging
 import sys
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+
+def setup_logging():
+    # Create a custom logger
+    logger = logging.getLogger(__name__)
+    
+    # Set the log level
+    logger.setLevel(logging.DEBUG)  # Can be INFO, DEBUG, WARNING, ERROR, CRITICAL
+
+    # Create handlers
+    c_handler = logging.StreamHandler(sys.stdout)  # Console handler
+    f_handler = logging.FileHandler('processing.log')  # File handler
+    
+    # Create formatters and add them to handlers
+    c_format = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+    f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    c_handler.setFormatter(c_format)
+    f_handler.setFormatter(f_format)
+    
+    # Set level for handlers
+    c_handler.setLevel(logging.INFO)
+    f_handler.setLevel(logging.DEBUG)
+
+    # Add handlers to the logger
+    logger.addHandler(c_handler)
+    logger.addHandler(f_handler)
+
+    return logger
+
+# Example usage
+logger = setup_logging()
+logger.debug("started up")
 
 app = Flask(__name__)
 API_URL = "https://generativelanguage.googleapis.com/"
@@ -20,12 +50,12 @@ def proxy(path):
     headers.pop('Content-Length', None)
 
     # Log the request
-    logger.info(f"Forwarding request to {url} with method {request.method}")
+    logger.debug(f"Forwarding request to {url} with method {request.method}")
 
     resp = requests.request(method=request.method, url=url, headers=headers, data=request.get_data(), params=request.args, allow_redirects=False)
 
     # Log the response
-    logger.info(f"Received {resp.status_code} response from the upstream server")
+    logger.debug(f"Received {resp.status_code} response from the upstream server")
 
     excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
     headers = [(name, value) for (name, value) in resp.raw.headers.items() if name.lower() not in excluded_headers]
