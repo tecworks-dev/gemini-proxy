@@ -51,6 +51,8 @@ def proxy(path):
 
     # Log the request
     logger.debug(f"Forwarding request to {url} with method {request.method}")
+    logger.debug(f"with args {request.args}")
+    logger.debug(f"with data {request.get_data()}")
 
     resp = requests.request(method=request.method, url=url, headers=headers, data=request.get_data(), params=request.args, allow_redirects=False)
 
